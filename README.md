@@ -4,7 +4,9 @@
 
 ## Documentation
 
-Coming soon! This is very much an alpha release---things will get a lot cleaner and less buggy very soon. In the mean time, feel free to follow the instructions below.
+We have some early auto-generated docs here: [docs/gum.md](docs/gum.md)
+
+This is very much an alpha release---things will get a lot cleaner and less buggy very soon. In the mean time, feel free to follow the instructions below.
 
 ## Installation
 
