@@ -26,16 +26,18 @@ pip install -e .
 1. Basic setup:
 
 ```python
-from gum import gum
-from gum.observers import YourObserver  # Replace with actual observer
+# Make sure to set OPENAI API ENV variables
 
-async with gum("user_name") as g:
-    # Add observers
-    observer = YourObserver()
-    g.add_observer(observer)
-    
-    # The system will automatically start processing updates
-    # Wait or perform other operations
+import asyncio
+from gum import gum
+from gum.observers import Screen
+
+async def main():
+    async with gum("Omar Shaikh", Screen()):
+        await asyncio.Future() # run forever (Ctrl-C to stop)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 2. Using the CLI:
