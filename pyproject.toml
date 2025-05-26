@@ -1,3 +1,29 @@
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta" 
+
+[project]
+name = "gum-ai"
+version = "0.1.0"
+readme = "README.md"
+authors = [{ name = "Omar Shaikh", email = "oshaikh13@gmail.com" }]
+license = {text = "MIT"}
+dependencies = [
+    "pillow",
+    "mss",
+    "pynput",
+    "shapely",
+    "pyobjc-framework-Quartz",
+    "openai>=1.0.0",
+    "SQLAlchemy>=2.0.0",
+    "pydantic>=2.0.0",
+    "sqlalchemy-utils>=0.41.0",
+    "python-dotenv>=1.0.0",
+    "scikit-learn",
+    "aiosqlite",
+    "greenlet"
+]
+requires-python = ">=3.6"
+
+[project.urls]
+"Homepage" = "https://github.com/GeneralUserModels/gum"

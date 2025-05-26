@@ -214,6 +214,56 @@ def create_fts_table(conn) -> None:
         )
     )
 
+# models.py  (put this next to create_fts_table)
+
+def create_observations_fts(conn) -> None:
+    """FTS5 index + triggers for the observations table."""
+    exists = conn.execute(sql_text(
+        "SELECT 1 FROM sqlite_master "
+        "WHERE type='table' AND name='observations_fts'"
+    )).fetchone()
+    if exists:
+        return                      # already present
+
+    conn.execute(sql_text(f"""
+        CREATE VIRTUAL TABLE observations_fts
+        USING fts5(
+            content,
+            content='observations',
+            content_rowid='id',
+            tokenize='{FTS_TOKENIZER}'
+        );
+    """))
+    conn.execute(sql_text("""
+        CREATE TRIGGER observations_ai
+        AFTER INSERT ON observations BEGIN
+            INSERT INTO observations_fts(rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """))
+    conn.execute(sql_text("""
+        CREATE TRIGGER observations_ad
+        AFTER DELETE ON observations BEGIN
+            INSERT INTO observations_fts(observations_fts, rowid, content)
+            VALUES ('delete', old.id, old.content);
+        END;
+    """))
+    conn.execute(sql_text("""
+        CREATE TRIGGER observations_au
+        AFTER UPDATE ON observations BEGIN
+            INSERT INTO observations_fts(observations_fts, rowid, content)
+            VALUES ('delete', old.id, old.content);
+            INSERT INTO observations_fts(rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """))
+    # back-fill the index
+    conn.execute(sql_text("""
+        INSERT INTO observations_fts(rowid, content)
+        SELECT id, content FROM observations;
+    """))
+
+
 async def init_db(
     db_path: str = "gum.db",
     db_directory: Optional[str] = None,
@@ -240,6 +290,7 @@ async def init_db(
 
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(create_fts_table)
+        await conn.run_sync(create_observations_fts)
 
     Session = async_sessionmaker(
         engine, 

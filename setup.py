@@ -21,11 +21,6 @@ setup(
         "aiosqlite",
         "greenlet"
     ],
-    entry_points={
-        'console_scripts': [
-            'gum=gum.cli:main',
-        ],
-    },
     author="Omar Shaikh",
     author_email="oshaikh13@gmail.com",
     description="A Python package with command-line interface",

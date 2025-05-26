@@ -1,6 +1,6 @@
 # GUM (General User Models)
 
-[![arXiv](https://img.shields.io/badge/arXiv-2403.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2403.xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2505.10831-b31b1b.svg)](https://arxiv.org/abs/2505.10831)
 
 ## Documentation
 
@@ -23,6 +23,8 @@ pip install -e .
 
 ## Usage
 
+0. Make sure you've set up your ENV variables. Create a .env file with an OPENAI_API_KEY.
+
 1. Basic setup:
 
 ```python
@@ -40,10 +42,10 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-2. Using the CLI:
+2. Use the example to start a server:
 
 ```bash
-gum start --user-name "your_name"
+python examples/start_gum.py -u "Your Name"
 ```
 
 3. Setting up an MCP:
@@ -68,17 +70,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License
 
-## Citation and Paper!
+## Citation and Paper
 
 If you're interested in reading more, please check out our paper!
 
-[Creating General User Models from Computer Use](https://arxiv.org/abs/2403.xxxxx)
+[Creating General User Models from Computer Use](https://arxiv.org/abs/2505.10831)
 
 ```bibtex
-@article{shaikh2025gums,
-    title={Creating General User Models from Computer Use},
-    author={Shaikh, Omar and Sapkota, Shardul and Rizvi, Shan and Horvitz, Eric and Park, Joon Sung and Yang, Diyi and Bernstein, Michael S.},
-    journal={arXiv preprint},
-    year={2025}
+@misc{shaikh2025creatinggeneralusermodels,
+    title={Creating General User Models from Computer Use}, 
+    author={Omar Shaikh and Shardul Sapkota and Shan Rizvi and Eric Horvitz and Joon Sung Park and Diyi Yang and Michael S. Bernstein},
+    year={2025},
+    eprint={2505.10831},
+    archivePrefix={arXiv},
+    primaryClass={cs.HC},
+    url={https://arxiv.org/abs/2505.10831}, 
 }
 ```
