@@ -13,8 +13,13 @@ This is very much an alpha release---things will get a lot cleaner and less bugg
 > [!WARNING]
 > This repository uses GPT 4.1 as a placeholder. However, we **STRONGLY** encourage users to deploy their own local models to serve GUMs. Our paper uses Qwen 2.5 VL and Llama 3.3. We use the OpenAI ChatCompletions API, but awesome open source inference projects like vLLM support the endpoint.
 
-Install from source for now (package coming soon!) As of now, we've only tested MacOS:
+The easiest way to set up is to download the package from pip:
 
+```bash
+pip install gum-ai
+```
+
+Alternatively, you can install from source. As of now, we've only tested MacOS:
 ```bash
 git clone https://github.com/GeneralUserModels/gum
 cd gum
