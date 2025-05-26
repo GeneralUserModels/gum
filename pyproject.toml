@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gum-ai"
-version = "0.1.0"
+version = "0.1.1"
 readme = "README.md"
 authors = [{ name = "Omar Shaikh", email = "oshaikh13@gmail.com" }]
 license = {text = "MIT"}
