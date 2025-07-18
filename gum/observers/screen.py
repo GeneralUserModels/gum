@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import sys
 import time
 from collections import deque
 from typing import Any, Dict, Iterable, List, Optional
@@ -15,7 +16,15 @@ import asyncio
 
 # — Third-party —
 import mss
-import Quartz
+# Conditional import for macOS-specific Quartz module
+try:
+    if sys.platform == "darwin":
+        import Quartz
+    else:
+        Quartz = None
+except ImportError:
+    Quartz = None
+
 from PIL import Image
 from pynput import mouse           # still synchronous
 from shapely.geometry import box
@@ -43,6 +52,19 @@ def _get_global_bounds() -> tuple[float, float, float, float]:
     -------
     (min_x, min_y, max_x, max_y) tuple in Quartz global coordinates.
     """
+    if Quartz is None:
+        # Fallback for non-macOS systems - use mss to get monitor bounds
+        with mss.mss() as sct:
+            monitors = sct.monitors[1:]  # Skip the "all monitors" entry
+            if not monitors:
+                return 0, 0, 1920, 1080  # Default fallback
+            
+            min_x = min(mon["left"] for mon in monitors)
+            min_y = min(mon["top"] for mon in monitors) 
+            max_x = max(mon["left"] + mon["width"] for mon in monitors)
+            max_y = max(mon["top"] + mon["height"] for mon in monitors)
+            return min_x, min_y, max_x, max_y
+    
     err, ids, cnt = Quartz.CGGetActiveDisplayList(16, None, None)
     if err != Quartz.kCGErrorSuccess:  # pragma: no cover (defensive)
         raise OSError(f"CGGetActiveDisplayList failed: {err}")
@@ -65,6 +87,11 @@ def _get_visible_windows() -> List[tuple[dict, float]]:
     is in ``[0.0, 1.0]``.  Internal system windows (Dock, WindowServer, …) are
     ignored.
     """
+    if Quartz is None:
+        # Fallback for non-macOS systems - return empty list
+        # Window management functionality is not available
+        return []
+    
     _, _, _, gmax_y = _get_global_bounds()
 
     opts = (
@@ -107,6 +134,10 @@ def _get_visible_windows() -> List[tuple[dict, float]]:
 
 def _is_app_visible(names: Iterable[str]) -> bool:
     """Return *True* if **any** window from *names* is at least partially visible."""
+    if Quartz is None:
+        # Fallback for non-macOS systems - assume app is visible
+        return True
+    
     targets = set(names)
     return any(
         info.get("kCGWindowOwnerName", "") in targets and ratio > 0

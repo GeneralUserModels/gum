@@ -10,15 +10,24 @@ setup(
         "mss",  # For screen capture
         "pynput",  # For mouse/keyboard monitoring
         "shapely",  # For geometry operations
-        "pyobjc-framework-Quartz",  # For macOS window management
+        "pyobjc-framework-Quartz; sys_platform == 'darwin'",  # For macOS window management
         "openai>=1.0.0",
         "SQLAlchemy>=2.0.0",
         "pydantic>=2.0.0",
-        "sqlalchemy-utils>=0.41.0",
         "python-dotenv>=1.0.0",
         "scikit-learn",
         "aiosqlite",
-        "greenlet"
+        "greenlet",
+        
+        # Web framework and API dependencies
+        "fastapi",
+        "uvicorn",
+        "python-multipart",
+        "aiohttp",
+        "python-dateutil",
+        
+        # Additional dependencies for data processing
+        "numpy",
     ],
     entry_points={
         'console_scripts': [
