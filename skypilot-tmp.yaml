@@ -12,6 +12,7 @@ envs:
   MODEL_NAME: Qwen/Qwen2.5-VL-32B-Instruct-AWQ
   HF_TOKEN: TOKEN_HERE
   VLLM_USE_V1: 1
+  PYTHONUTF8: 1
 
 resources:
   cloud: gcp
@@ -49,4 +50,14 @@ run: |
     --model $MODEL_NAME \
     --host 0.0.0.0 \
     --max-model-len 64000 \
-    --limit-mm-per-prompt "image=15"
+    --limit-mm-per-prompt '{"image":15}'
+
+# curl  http://SERVER_IP:8000/v1/chat/completions \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#         "model": "Qwen/Qwen2.5-VL-32B-Instruct-AWQ",
+#         "messages": [
+#             {"role": "system", "content": "You are a helpful assistant."},
+#             {"role": "user", "content": "What is 2 + 2?"}
+#         ]
+#     }'
