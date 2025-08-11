@@ -33,14 +33,6 @@ python-dotenv>=1.0.0
 scikit-learn
 numpy
 
-# Web framework and API
-fastapi
-uvicorn
-python-multipart
-
-# HTTP client for async requests
-aiohttp
-
 # Date/time utilities
 python-dateutil
 
