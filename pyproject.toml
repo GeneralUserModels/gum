@@ -13,7 +13,7 @@ dependencies = [
     "mss",
     "pynput",
     "shapely",
-    "pyobjc-framework-Quartz",
+    "pyobjc-framework-Quartz; sys_platform == 'darwin'",
     "openai>=1.0.0",
     "SQLAlchemy>=2.0.0",
     "pydantic>=2.0.0",

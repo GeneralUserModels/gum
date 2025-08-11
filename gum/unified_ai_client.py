@@ -21,9 +21,9 @@ except ImportError:
     aiohttp = None
 
 # Import our specialized clients
-from azure_text_client import azure_text_completion
-from openai_text_client import openai_text_completion
-from openrouter_vision_client import openrouter_vision_completion
+from gum.azure_text_client import azure_text_completion
+from gum.openai_text_client import openai_text_completion
+from gum.openrouter_vision_client import openrouter_vision_completion
 import os
 
 # Load environment variables at module level

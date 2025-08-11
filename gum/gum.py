@@ -115,7 +115,7 @@ class gum:
         """Get the unified AI client, initializing it if needed."""
         if self.ai_client is None:
             # Import here to avoid circular imports
-            from unified_ai_client import get_unified_client
+            from gum.unified_ai_client import get_unified_client
             self.ai_client = await get_unified_client()
             self.logger.info("Unified AI client initialized for GUM")
         return self.ai_client
