@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Callable, List
 from .models import observation_proposition
 
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert
 
@@ -27,7 +26,6 @@ from .schemas import (
     PropositionSchema,
     RelationSchema,
     Update,
-    get_schema,
     AuditSchema
 )
 from gum.prompts.gum import AUDIT_PROMPT, PROPOSE_PROMPT, REVISE_PROMPT, SIMILAR_PROMPT
@@ -38,6 +36,10 @@ class gum:
     This class provides functionality for observing user behavior, generating and managing
     propositions about user behavior, and maintaining relationships between observations
     and propositions.
+
+    The system uses a unified AI client that supports multiple providers:
+    - Text completion: Azure OpenAI (default) or OpenAI (set TEXT_PROVIDER=openai)
+    - Vision completion: OpenRouter (default)
 
     Args:
         user_name (str): The name of the user being modeled.
@@ -51,6 +53,8 @@ class gum:
         max_concurrent_updates (int, optional): Maximum number of concurrent updates. Defaults to 4.
         verbosity (int, optional): Logging verbosity level. Defaults to logging.INFO.
         audit_enabled (bool, optional): Whether to enable auditing. Defaults to False.
+        api_base (str, optional): Deprecated, use environment variables instead.
+        api_key (str, optional): Deprecated, use environment variables instead.
     """
 
     def __init__(
@@ -88,16 +92,14 @@ class gum:
             h.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
             self.logger.addHandler(h)
 
-        # prompts
+        # prompts - use default prompts from gum.py, or load from files if custom methods are added
         self.propose_prompt = propose_prompt or PROPOSE_PROMPT
         self.similar_prompt = similar_prompt or SIMILAR_PROMPT
         self.revise_prompt = revise_prompt or REVISE_PROMPT
         self.audit_prompt = audit_prompt or AUDIT_PROMPT
 
-        self.client = AsyncOpenAI(
-            base_url=api_base or os.getenv("GUM_LM_API_BASE"), 
-            api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
-        )
+        # Initialize unified AI client (supports Azure OpenAI, OpenAI, and OpenRouter)
+        self.ai_client = None  # Will be initialized lazily
 
         self.engine = None
         self.Session = None
@@ -108,6 +110,146 @@ class gum:
         self._tasks: set[asyncio.Task] = set()
         self._loop_task: asyncio.Task | None = None
         self.update_handlers: list[Callable[[Observer, Update], None]] = []
+
+    async def _get_ai_client(self):
+        """Get the unified AI client, initializing it if needed."""
+        if self.ai_client is None:
+            # Import here to avoid circular imports
+            from gum.unified_ai_client import get_unified_client
+            self.ai_client = await get_unified_client()
+            self.logger.info("Unified AI client initialized for GUM")
+        return self.ai_client
+
+    def _parse_ai_json_response(self, response_content: str, expected_key: str = None):
+        """Parse JSON from AI response content with fallback handling."""
+        
+        # Add detailed logging for debugging
+        self.logger.info(f"JSON Parsing Debug - Input Analysis:")
+        self.logger.info(f"   Response length: {len(response_content)} characters")
+        self.logger.info(f"   Expected key: {expected_key}")
+        self.logger.info(f"   Raw response (first 300 chars): {response_content[:300]}...")
+        self.logger.info(f"   Raw response (last 100 chars): ...{response_content[-100:]}")
+        
+        try:
+            # Try to parse the response as JSON directly
+            self.logger.info("Attempting direct JSON parsing...")
+            parsed_response = json.loads(response_content)
+            self.logger.info(f"Direct JSON parsing successful!")
+            self.logger.info(f"   Parsed keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'Not a dict'}")
+            
+            if expected_key and expected_key in parsed_response:
+                self.logger.info(f"Found expected key '{expected_key}' in response")
+                return parsed_response[expected_key]
+            return parsed_response
+            
+        except json.JSONDecodeError as e:
+            self.logger.warning(f"Direct JSON parsing failed: {e}")
+            
+            # Try to extract JSON from markdown code blocks first
+            import re
+            
+            self.logger.info("Attempting markdown JSON extraction...")
+            # Look for JSON in markdown code blocks - handle both complete and truncated blocks
+            markdown_match = re.search(r'```(?:json)?\s*(.*?)(?:```|\Z)', response_content, re.DOTALL)
+            if markdown_match:
+                json_content = markdown_match.group(1).strip()
+                self.logger.info(f"Extracted JSON from markdown (length: {len(json_content)}):")
+                self.logger.info(f"   Extracted content: {json_content}")
+                
+                # Try to parse the extracted content as-is first
+                try:
+                    parsed_response = json.loads(json_content)
+                    self.logger.info(f"Markdown JSON parsing successful!")
+                    self.logger.info(f"   Parsed keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'Not a dict'}")
+                    
+                    if expected_key and expected_key in parsed_response:
+                        self.logger.info(f"Found expected key '{expected_key}' in markdown JSON")
+                        return parsed_response[expected_key]
+                    return parsed_response
+                    
+                except json.JSONDecodeError as e:
+                    self.logger.warning(f"Failed to parse extracted JSON as-is: {e}")
+                    
+                    # Try to repair truncated JSON by finding the last complete object
+                    self.logger.info("Attempting to repair truncated JSON...")
+                    
+                    # Find the last complete JSON object/array
+                    brace_count = 0
+                    bracket_count = 0
+                    last_complete_pos = -1
+                    
+                    for i, char in enumerate(json_content):
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                        elif char == '[':
+                            bracket_count += 1
+                        elif char == ']':
+                            bracket_count -= 1
+                            
+                        # Check if we have a complete structure
+                        if brace_count == 0 and bracket_count == 0 and i > 0:
+                            last_complete_pos = i + 1
+                    
+                    if last_complete_pos > 0:
+                        repaired_json = json_content[:last_complete_pos]
+                        self.logger.info(f"Attempting repair with content up to position {last_complete_pos}")
+                        self.logger.info(f"   Repaired JSON: {repaired_json}")
+                        
+                        try:
+                            parsed_response = json.loads(repaired_json)
+                            self.logger.info(f"Repaired JSON parsing successful!")
+                            self.logger.info(f"   Parsed keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'Not a dict'}")
+                            
+                            if expected_key and expected_key in parsed_response:
+                                self.logger.info(f"Found expected key '{expected_key}' in repaired JSON")
+                                return parsed_response[expected_key]
+                            return parsed_response
+                            
+                        except json.JSONDecodeError as e2:
+                            self.logger.error(f"Repair attempt also failed: {e2}")
+                    else:
+                        self.logger.warning("Could not find a complete JSON structure to repair")
+                        
+            else:
+                self.logger.warning("No markdown code blocks found")
+            
+            # Fallback: look for any JSON-like structure
+            self.logger.info("Attempting fallback JSON pattern matching...")
+            json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+            if json_match:
+                json_candidate = json_match.group(0)
+                self.logger.info(f"Found JSON-like pattern (length: {len(json_candidate)}):")
+                self.logger.info(f"   JSON candidate: {json_candidate}")
+                
+                try:
+                    parsed_response = json.loads(json_candidate)
+                    self.logger.info(f"Fallback JSON parsing successful!")
+                    self.logger.info(f"   Parsed keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'Not a dict'}")
+                    
+                    if expected_key and expected_key in parsed_response:
+                        self.logger.info(f"Found expected key '{expected_key}' in fallback JSON")
+                        return parsed_response[expected_key]
+                    return parsed_response
+                    
+                except json.JSONDecodeError as e:
+                    self.logger.error(f"Fallback JSON parsing also failed: {e}")
+                    self.logger.error(f"   Problematic content: {json_candidate}")
+            else:
+                self.logger.warning("No JSON-like patterns found")
+            
+            # If JSON parsing fails, log the response and return appropriate default
+            self.logger.error(f"ALL JSON parsing methods failed!")
+            self.logger.error(f"   Full response content:")
+            self.logger.error(f"   {response_content}")
+            
+            if expected_key == "propositions":
+                self.logger.info("Returning empty list for propositions")
+                return []
+            else:
+                self.logger.info("Returning empty dict")
+                return {}
 
     def start_update_loop(self):
         """Start the asynchronous update loop for processing observer updates."""
@@ -209,14 +351,18 @@ class gum:
             .replace("{inputs}", update.content)
         )
 
-        schema = PropositionSchema.model_json_schema()
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        # Get the unified AI client
+        client = await self._get_ai_client()
+        
+        # Make the API call using the unified client
+        response_content = await client.text_completion(
             messages=[{"role": "user", "content": prompt}],
-            response_format=get_schema(schema),
+            max_tokens=2000,
+            temperature=0.1
         )
 
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+        # Parse the JSON response
+        return self._parse_ai_json_response(response_content, "propositions")
 
     async def _build_relation_prompt(self, all_props) -> str:
         """Build a prompt for analyzing relationships between propositions.
@@ -255,13 +401,24 @@ class gum:
         ]
         prompt_text = await self._build_relation_prompt(payload)
 
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        # Get the unified AI client
+        client = await self._get_ai_client()
+        
+        # Make the API call using the unified client
+        response_content = await client.text_completion(
             messages=[{"role": "user", "content": prompt_text}],
-            response_format=get_schema(RelationSchema.model_json_schema()),
+            max_tokens=2000,
+            temperature=0.1
         )
 
-        data = RelationSchema.model_validate_json(rsp.choices[0].message.content)
+        # Parse the JSON response and validate
+        try:
+            relations_data = self._parse_ai_json_response(response_content, "relations")
+            data = RelationSchema.model_validate({"relations": relations_data})
+        except Exception as e:
+            self.logger.error(f"Failed to parse relation data: {e}")
+            # Return empty groups if parsing fails
+            return [], [], []
 
         id_to_prop = {p.id: p for p in rel_props}
         ident, sim, unrel = set(), set(), set()
@@ -324,13 +481,20 @@ class gum:
             list[dict]: List of revised propositions.
         """
         body = await self._build_revision_body(similar_cluster, related_obs)
-        prompt = self.revise_prompt.replace("{body}", body)
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        prompt = self.revise_prompt.replace("{body}", body).replace("{user_name}", self.user_name)
+        
+        # Get the unified AI client
+        client = await self._get_ai_client()
+        
+        # Make the API call using the unified client
+        response_content = await client.text_completion(
             messages=[{"role": "user", "content": prompt}],
-            response_format=get_schema(PropositionSchema.model_json_schema()), 
+            max_tokens=2000,
+            temperature=0.1
         )
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+
+        # Parse the JSON response
+        return self._parse_ai_json_response(response_content, "propositions")
 
     async def _generate_and_search(
         self, session: AsyncSession, update: Update, obs: Observation
@@ -462,19 +626,29 @@ class gum:
             .replace("{user_name}", self.user_name)
         )
 
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        # Get the unified AI client
+        client = await self._get_ai_client()
+        
+        # Make the API call using the unified client
+        response_content = await client.text_completion(
             messages=[{"role": "user", "content": prompt}],
-            response_format=get_schema(AuditSchema.model_json_schema()),
-            temperature=0.0,
+            max_tokens=1000,
+            temperature=0.0
         )
-        decision = json.loads(rsp.choices[0].message.content)
 
-        if not decision["transmit_data"]:
+        # Parse the JSON response
+        decision = self._parse_ai_json_response(response_content)
+        
+        # Safely handle the decision with fallbacks
+        transmit_data = decision.get("transmit_data", True) if isinstance(decision, dict) else True
+        data_type = decision.get("data_type", "Unknown") if isinstance(decision, dict) else "Unknown"
+        subject = decision.get("subject", "Unknown") if isinstance(decision, dict) else "Unknown"
+
+        if not transmit_data:
             self.logger.warning(
                 "Audit blocked transmission (data_type=%s, subject=%s)",
-                decision["data_type"],
-                decision["subject"],
+                data_type,
+                subject,
             )
             return True
 

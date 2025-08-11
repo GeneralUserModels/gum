@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import sys
 import time
 from collections import deque
 from typing import Any, Dict, Iterable, List, Optional
@@ -15,7 +16,15 @@ import asyncio
 
 # — Third-party —
 import mss
-import Quartz
+# Conditional import for macOS-specific Quartz module
+try:
+    if sys.platform == "darwin":
+        import Quartz
+    else:
+        Quartz = None
+except ImportError:
+    Quartz = None
+
 from PIL import Image
 from pynput import mouse           # still synchronous
 from shapely.geometry import box
@@ -24,9 +33,6 @@ from shapely.ops import unary_union
 # — Local —
 from .observer import Observer
 from ..schemas import Update
-
-# — OpenAI async client —
-from openai import AsyncOpenAI
 
 # — Local —
 from gum.prompts.screen import TRANSCRIPTION_PROMPT, SUMMARY_PROMPT
@@ -43,6 +49,19 @@ def _get_global_bounds() -> tuple[float, float, float, float]:
     -------
     (min_x, min_y, max_x, max_y) tuple in Quartz global coordinates.
     """
+    if Quartz is None:
+        # Fallback for non-macOS systems - use mss to get monitor bounds
+        with mss.mss() as sct:
+            monitors = sct.monitors[1:]  # Skip the "all monitors" entry
+            if not monitors:
+                return 0, 0, 1920, 1080  # Default fallback
+            
+            min_x = min(mon["left"] for mon in monitors)
+            min_y = min(mon["top"] for mon in monitors) 
+            max_x = max(mon["left"] + mon["width"] for mon in monitors)
+            max_y = max(mon["top"] + mon["height"] for mon in monitors)
+            return min_x, min_y, max_x, max_y
+    
     err, ids, cnt = Quartz.CGGetActiveDisplayList(16, None, None)
     if err != Quartz.kCGErrorSuccess:  # pragma: no cover (defensive)
         raise OSError(f"CGGetActiveDisplayList failed: {err}")
@@ -65,6 +84,11 @@ def _get_visible_windows() -> List[tuple[dict, float]]:
     is in ``[0.0, 1.0]``.  Internal system windows (Dock, WindowServer, …) are
     ignored.
     """
+    if Quartz is None:
+        # Fallback for non-macOS systems - return empty list
+        # Window management functionality is not available
+        return []
+    
     _, _, _, gmax_y = _get_global_bounds()
 
     opts = (
@@ -107,6 +131,10 @@ def _get_visible_windows() -> List[tuple[dict, float]]:
 
 def _is_app_visible(names: Iterable[str]) -> bool:
     """Return *True* if **any** window from *names* is at least partially visible."""
+    if Quartz is None:
+        # Fallback for non-macOS systems - assume app is visible
+        return True
+    
     targets = set(names)
     return any(
         info.get("kCGWindowOwnerName", "") in targets and ratio > 0
@@ -191,16 +219,20 @@ class Screen(Observer):
         self._history: deque[str] = deque(maxlen=max(0, history_k))
         self._pending_event: Optional[dict] = None
         self._debounce_handle: Optional[asyncio.TimerHandle] = None
-        self.client = AsyncOpenAI(
-            # try the class, then the env for screen, then the env for gum
-            base_url=api_base or os.getenv("SCREEN_LM_API_BASE") or os.getenv("GUM_LM_API_BASE"), 
-
-            # try the class, then the env for screen, then the env for GUM, then none
-            api_key=api_key or os.getenv("SCREEN_LM_API_KEY") or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
-        )
+        
+        # Initialize unified AI client (will be set up lazily)
+        self.ai_client = None
 
         # call parent
         super().__init__()
+
+    async def _get_ai_client(self):
+        """Get the unified AI client, initializing it if needed."""
+        if self.ai_client is None:
+            # Import here to avoid circular imports
+            from gum.unified_ai_client import get_unified_client
+            self.ai_client = await get_unified_client()
+        return self.ai_client
 
     # ─────────────────────────────── tiny sync helpers
     @staticmethod
@@ -233,9 +265,9 @@ class Screen(Observer):
         with open(img_path, "rb") as fh:
             return base64.b64encode(fh.read()).decode()
 
-    # ─────────────────────────────── OpenAI Vision (async)
+    # ─────────────────────────────── Vision Analysis (async)
     async def _call_gpt_vision(self, prompt: str, img_paths: list[str]) -> str:
-        """Call GPT Vision API to analyze images.
+        """Call GPT Vision API to analyze images using unified AI client.
         
         Args:
             prompt (str): Prompt to guide the analysis.
@@ -244,23 +276,29 @@ class Screen(Observer):
         Returns:
             str: GPT's analysis of the images.
         """
-        content = [
-            {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
-            }
-            for encoded in (await asyncio.gather(
-                *[asyncio.to_thread(self._encode_image, p) for p in img_paths]
-            ))
-        ]
-        content.append({"type": "text", "text": prompt})
-
-        rsp = await self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": content}],
-            response_format={"type": "text"},
+        # Encode images to base64
+        encoded_images = await asyncio.gather(
+            *[asyncio.to_thread(self._encode_image, p) for p in img_paths]
         )
-        return rsp.choices[0].message.content
+        
+        # Use the first image for the unified client (it expects single image)
+        # For multiple images, we'll concatenate them or use the most recent
+        if len(encoded_images) == 1:
+            base64_image = encoded_images[0]
+        else:
+            # For multiple images, use the last one (most recent)
+            # In the future, we could enhance the unified client to handle multiple images
+            base64_image = encoded_images[-1]
+        
+        # Get the unified AI client and use vision completion
+        client = await self._get_ai_client()
+        
+        return await client.vision_completion(
+            text_prompt=prompt,
+            base64_image=base64_image,
+            max_tokens=2000,
+            temperature=0.1
+        )
 
     # ─────────────────────────────── I/O helpers
     async def _save_frame(self, frame, tag: str) -> str:
