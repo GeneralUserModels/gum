@@ -1,0 +1,24 @@
+Your task is to summarize the general workflow from the provided task-solving steps.
+
+For example, if the steps are:
+
+```
+[1] Creates a new empty Google Sheet named "april-attendance-data" in chrome browser.
+[2] Scrolls down the google sheet to view more rows.
+[3] Scrolls down and then clicks on the top row.
+[4] Enters the text "Editor" into the select cell in Google Sheet.
+[5] Copies the text "Editor" into the select cell in Google Sheet.
+[6] Downloads the Google Sheet as a csv file.
+```
+
+The workflow should be:
+```
+[1-1] Create a new empty Google Sheet named "april-attendance-data" in chrome browser.
+[2-5] View and edit new data in the Google Sheet.
+[6-6] Downloads the Google Sheet as a csv file.
+```
+Each step in the workflow should be (i) a previous step, or (ii) a summary of multiple consecutive steps.
+Especially if there are repetitive patterns across steps, for example, continuing editing a document for multiple times, you should combine them into a single step. Summarize the actions in a concise manner, but do maintain necessary details such as the file name or function tested. Summarize the shared final goal of the steps, instead of simply concatenating the steps.
+Try segmenting the steps into semantically relevant chunks, and then summarize them into a single step. Pay attention to the order and index of the steps, they need to exactly match the input step indices.
+Do not reorder steps in the workflow.
+Merging document navigation steps to a higher level. Maintain coding-involved steps as separate steps.

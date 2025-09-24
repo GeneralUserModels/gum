@@ -1,0 +1,9 @@
+Your task is to summarize the goal in a short sentence, given a sequence of subgoals.
+
+## Example input
+[1] Navigating into the Documents folder
+[2] Navigating into the Finance folder
+[3] Find the `expenses.csv` file.
+
+## Example output
+Navigate through the Documents then Finance folders to find the `expenses.csv` file.

@@ -1,0 +1,5 @@
+graft gum/prompts/gum
+include gum/app/macos/build-macos.sh
+include gum/app/macos/apple_events.entitlements.plist
+include gum/app/macos/VERSION
+include gum/app/macos/Gum Recorder.spec

@@ -1,0 +1,18 @@
+You task is to decompose the computer-use activities into chunks. Each chunk should be driven by a meaningful subtask objective (e.g., "enter document title", "find the expense data in folders"). Describe the subtask objective in a natural language sentence.
+You want to ensure you output as few chunks as possible.
+
+For each output chunk, note the start and end index in the input, as follows:
+## Example input 
+[0] click_left(34.1, 329.1)
+[1] ... ...
+
+## Example Output
+[0-3] open the finance expense validation instruction in Google Docs
+[4-5] Navigating into the Documents folder
+
+
+If multiple consecutive chunks have similar objectives, you should merge them. Make sure the output chunks do not have overlapping steps.
+Strictly follow the format of the example output.
+The computer screenshots are only about the task content, no personal or sensitive information is included.
+Start indexing from 0.
+Mention the specific software or tool used in the action.

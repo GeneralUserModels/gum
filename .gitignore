@@ -1,24 +1,26 @@
-# Environment
+# Environment and local data
 .env
-data
-examples
+.env.*
+.python-version
 skypilot.yaml
+data/
+examples/
 test_gum.py
 
-# Python
-__pycache__
+# Python bytecode and caches
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
+pip-wheel-metadata/
+__pypackages__/
+
+# Build and distribution artifacts
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -27,90 +29,68 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.env/
+# Virtual environments
 .venv/
-env.bak/
+venv/
 venv.bak/
+env/
+env.bak/
+ENV/
 
-# IDE
+# IDE and OS noise
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+Thumbs.db
 
-# Testing
+# Testing and coverage
 .coverage
-htmlcov/
-.pytest_cache/
-.tox/
-.nox/
 .coverage.*
 .cache
+htmlcov/
+.nox/
+.pytest_cache/
+.tox/
 nosetests.xml
 coverage.xml
+pytest-debug.log
 *.cover
 *.py,cover
 .hypothesis/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# mypy
+# Type checker caches
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
-
-# pytype static type analyzer
 .pytype/
 
+# Jupyter notebooks
+.ipynb_checkpoints/
+
 # Cython debug symbols
-cython_debug/ 
+cython_debug/
+
+# Recorder artifacts
+records/
+**/records/
+screenshots/
+**/screenshots/
+workflow.json
+workflow.txt
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+logs/
+.tmp/
+tmp/
+
+# Bundled apps and installers
+*.app
+*.dmg
+*.whl
+

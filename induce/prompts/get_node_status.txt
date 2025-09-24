@@ -1,0 +1,2 @@
+Your task is to determine if the computer-use action sequence roughly achieves the goal.
+Output "YES" if the goal is achieved, otherwise output "NO".
