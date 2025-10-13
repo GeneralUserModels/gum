@@ -13,7 +13,6 @@ from typing import Callable, List
 from .models import observation_proposition
 import traceback
 
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert
 
@@ -23,6 +22,7 @@ from .db_utils import (
 )
 from .models import Observation, Proposition, init_db
 from .observers import Observer
+from .providers import create_provider, ModelProvider
 from .schemas import (
     PropositionItem,
     PropositionSchema,
@@ -72,6 +72,7 @@ class gum:
         api_key: str | None = None,
         min_batch_size: int = 5,
         max_batch_size: int = 50,
+        enable_notifications: bool = False,
     ):
         # basic paths
         data_directory = os.path.expanduser(data_directory)
@@ -82,11 +83,15 @@ class gum:
         self.observers: list[Observer] = list(observers)
         self.model = model
         self.audit_enabled = audit_enabled
+        self.enable_notifications = enable_notifications
 
         # batching configuration
         self.min_batch_size = min_batch_size
         self.max_batch_size = max_batch_size
-
+        
+        # notification system
+        self.notifier = None
+        
         # logging
         self.logger = logging.getLogger("gum")
         self.logger.setLevel(verbosity)
@@ -95,16 +100,26 @@ class gum:
             h.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
             self.logger.addHandler(h)
 
+        if enable_notifications:
+            from .notifier import GUMNotifier
+            self.notifier = GUMNotifier(user_name, gum_instance=self)
+            self.logger.info("Notifications enabled")
+        
         # prompts
         self.propose_prompt = propose_prompt or PROPOSE_PROMPT
         self.similar_prompt = similar_prompt or SIMILAR_PROMPT
         self.revise_prompt = revise_prompt or REVISE_PROMPT
         self.audit_prompt = audit_prompt or AUDIT_PROMPT
 
-        self.client = AsyncOpenAI(
-            base_url=api_base or os.getenv("GUM_LM_API_BASE"), 
-            api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
+        self.provider = create_provider(
+            model=model,
+            api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
+            api_base=api_base or os.getenv("GUM_LM_API_BASE")
         )
+        
+        # Log provider information for debugging
+        self.logger.info(f"Using model: {model}")
+        self.logger.info(f"Provider: {type(self.provider).__name__}")
 
         self.engine = None
         self.Session = None
@@ -232,10 +247,15 @@ class gum:
         observation_ids = []
         
         for obs in batched_observations:
-            combined_content.append(f"[{obs['observer_name']}] {obs['content']}")
+            timestamp = obs.get('timestamp', 'unknown')
+            combined_content.append(f"[{obs['observer_name']} - {timestamp}] {obs['content']}")
             observation_ids.append(obs['id'])
             
-        combined_text = "\n\n".join(combined_content)
+        # Add temporal context
+        temporal_context = self._get_temporal_context(batched_observations)
+        
+        # Combine all context
+        combined_text = f"{temporal_context}\n\n" + "\n\n".join(combined_content)
         
         # Create a combined update
         combined_update = Update(
@@ -258,6 +278,10 @@ class gum:
                 
                 await session.flush()
                 
+                # Update batched_observations with database IDs for notifier
+                for i, observation in enumerate(observations):
+                    batched_observations[i]['id'] = observation.id
+                
                 # Process the combined content
                 pool = await self._generate_and_search(session, combined_update)
                 identical, similar, different = await self._filter_propositions(pool)
@@ -269,6 +293,11 @@ class gum:
                 
                 # Observations are already removed from queue by pop_batch()
                 self.logger.info(f"Completed processing batch of {len(batched_observations)} observations")
+                
+                # Process for notifications if enabled
+                if self.notifier:
+                    self.logger.info("Processing batch for notifications...")
+                    await self.notifier.process_observation_batch(batched_observations)
                 
         except Exception as e:
             self.logger.error(f"Error processing batch: {e}")
@@ -296,13 +325,41 @@ class gum:
         )
 
         schema = PropositionSchema.model_json_schema()
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        rsp = await self.provider.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             response_format=get_schema(schema),
         )
 
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+        # Debug: Log the response to understand what we're getting
+        self.logger.debug(f"Model response: {repr(rsp)}")
+        
+        if not rsp or not rsp.strip():
+            self.logger.error("Empty response from model")
+            return []
+        
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_response = rsp.strip()
+        if cleaned_response.startswith('```json'):
+            # Remove ```json from start and ``` from end
+            cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]  # Remove ```
+            cleaned_response = cleaned_response.strip()
+        elif cleaned_response.startswith('```'):
+            # Remove ``` from start and end
+            cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        
+        try:
+            parsed = json.loads(cleaned_response)
+            return parsed.get("propositions", [])
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error: {e}")
+            self.logger.error(f"Original response: {repr(rsp)}")
+            self.logger.error(f"Cleaned response: {repr(cleaned_response)}")
+            return []
 
     async def _build_relation_prompt(self, all_props) -> str:
         """Build a prompt for analyzing relationships between propositions.
@@ -341,13 +398,32 @@ class gum:
         ]
         prompt_text = await self._build_relation_prompt(payload)
 
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        rsp = await self.provider.chat_completion(
             messages=[{"role": "user", "content": prompt_text}],
             response_format=get_schema(RelationSchema.model_json_schema()),
         )
 
-        data = RelationSchema.model_validate_json(rsp.choices[0].message.content)
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_response = rsp.strip()
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        elif cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        
+        try:
+            data = RelationSchema.model_validate_json(cleaned_response)
+        except (json.JSONDecodeError, ValueError) as e:
+            self.logger.error(f"Failed to parse relation response: {e}")
+            self.logger.error(f"Original response: {repr(rsp)}")
+            self.logger.error(f"Cleaned response: {repr(cleaned_response)}")
+            # Return empty relations if parsing fails
+            return {"relations": []}
 
         id_to_prop = {p.id: p for p in rel_props}
         ident, sim, unrel = set(), set(), set()
@@ -411,12 +487,31 @@ class gum:
         """
         body = await self._build_revision_body(similar_cluster, related_obs)
         prompt = self.revise_prompt.replace("{body}", body)
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        rsp = await self.provider.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             response_format=get_schema(PropositionSchema.model_json_schema()), 
         )
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_response = rsp.strip()
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        elif cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        
+        try:
+            parsed = json.loads(cleaned_response)
+            return parsed.get("propositions", [])
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error in revision: {e}")
+            self.logger.error(f"Original response: {repr(rsp)}")
+            self.logger.error(f"Cleaned response: {repr(cleaned_response)}")
+            return []
 
     async def _generate_and_search(
         self, session: AsyncSession, update: Update
@@ -550,13 +645,32 @@ class gum:
             .replace("{user_name}", self.user_name)
         )
 
-        rsp = await self.client.chat.completions.create(
-            model=self.model,
+        rsp = await self.provider.chat_completion(
             messages=[{"role": "user", "content": prompt}],
             response_format=get_schema(AuditSchema.model_json_schema()),
             temperature=0.0,
         )
-        decision = json.loads(rsp.choices[0].message.content)
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_response = rsp.strip()
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        elif cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+        
+        try:
+            decision = json.loads(cleaned_response)
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON decode error in audit: {e}")
+            self.logger.error(f"Original response: {repr(rsp)}")
+            self.logger.error(f"Cleaned response: {repr(cleaned_response)}")
+            # Default to allowing transmission if parsing fails
+            decision = {"transmit_data": True, "data_type": "unknown", "subject": "unknown"}
 
         if not decision["transmit_data"]:
             self.logger.warning(
@@ -584,6 +698,29 @@ class gum:
         async with self.Session() as s:
             async with s.begin():
                 yield s
+
+
+    def _get_temporal_context(self, batched_observations) -> str:
+        """Get temporal context for the batch of observations."""
+        if not batched_observations:
+            return "Time Period: Unknown"
+        
+        timestamps = [obs.get('timestamp') for obs in batched_observations if obs.get('timestamp')]
+        if not timestamps:
+            return "Time Period: Unknown"
+        
+        try:
+            from datetime import datetime
+            parsed_times = [datetime.fromisoformat(ts.replace('Z', '+00:00')) for ts in timestamps]
+            start_time = min(parsed_times)
+            end_time = max(parsed_times)
+            duration = end_time - start_time
+            
+            return f"Time Period: {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')} (Duration: {duration})"
+        except Exception:
+            return f"Time Period: {min(timestamps)} to {max(timestamps)}"
+
+
 
     @staticmethod
     async def _attach_obs_if_missing(prop: Proposition, obs: Observation, session):
