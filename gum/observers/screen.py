@@ -25,8 +25,8 @@ from shapely.ops import unary_union
 from .observer import Observer
 from ..schemas import Update
 
-# — OpenAI async client —
-from openai import AsyncOpenAI
+# — Model provider —
+from ..providers import create_provider, ModelProvider
 
 # — Local —
 from gum.prompts.screen import TRANSCRIPTION_PROMPT, SUMMARY_PROMPT
@@ -191,12 +191,10 @@ class Screen(Observer):
         self._history: deque[str] = deque(maxlen=max(0, history_k))
         self._pending_event: Optional[dict] = None
         self._debounce_handle: Optional[asyncio.TimerHandle] = None
-        self.client = AsyncOpenAI(
-            # try the class, then the env for screen, then the env for gum
-            base_url=api_base or os.getenv("SCREEN_LM_API_BASE") or os.getenv("GUM_LM_API_BASE"), 
-
-            # try the class, then the env for screen, then the env for GUM, then none
-            api_key=api_key or os.getenv("SCREEN_LM_API_KEY") or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
+        self.provider = create_provider(
+            model=model_name,
+            api_key=api_key or os.getenv("SCREEN_LM_API_KEY") or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
+            api_base=api_base or os.getenv("SCREEN_LM_API_BASE") or os.getenv("GUM_LM_API_BASE")
         )
 
         # call parent
@@ -234,15 +232,15 @@ class Screen(Observer):
             return base64.b64encode(fh.read()).decode()
 
     # ─────────────────────────────── OpenAI Vision (async)
-    async def _call_gpt_vision(self, prompt: str, img_paths: list[str]) -> str:
-        """Call GPT Vision API to analyze images.
+    async def _call_vision_api(self, prompt: str, img_paths: list[str]) -> str:
+        """Call Vision API to analyze images.
         
         Args:
             prompt (str): Prompt to guide the analysis.
             img_paths (list[str]): List of image paths to analyze.
             
         Returns:
-            str: GPT's analysis of the images.
+            str: Model's analysis of the images.
         """
         content = [
             {
@@ -255,12 +253,11 @@ class Screen(Observer):
         ]
         content.append({"type": "text", "text": prompt})
 
-        rsp = await self.client.chat.completions.create(
-            model=self.model_name,
+        rsp = await self.provider.vision_completion(
             messages=[{"role": "user", "content": content}],
             response_format={"type": "text"},
         )
-        return rsp.choices[0].message.content
+        return rsp
 
     # ─────────────────────────────── I/O helpers
     async def _save_frame(self, frame, tag: str) -> str:
@@ -294,16 +291,16 @@ class Screen(Observer):
         self._history.append(before_path)
         prev_paths = list(self._history)
 
-        # async OpenAI calls
+        # async vision API calls
         try:
-            transcription = await self._call_gpt_vision(self.transcription_prompt, [before_path, after_path])
+            transcription = await self._call_vision_api(self.transcription_prompt, [before_path, after_path])
         except Exception as exc:                                        # pragma: no cover
             transcription = f"[transcription failed: {exc}]"
 
         prev_paths.append(before_path)
         prev_paths.append(after_path)
         try:
-            summary = await self._call_gpt_vision(self.summary_prompt, prev_paths)
+            summary = await self._call_vision_api(self.summary_prompt, prev_paths)
         except Exception as exc:                                    # pragma: no cover
             summary = f"[summary failed: {exc}]"
 
