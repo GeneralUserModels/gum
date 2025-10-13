@@ -245,3 +245,113 @@ async def get_related_observations(
     )
     result = await session.execute(stmt)
     return result.scalars().all()
+
+
+async def get_related_propositions(
+    session: AsyncSession,
+    observation_id: int,
+    *,  # Force keyword arguments for optional parameters
+    limit: int | None = None,
+) -> List[Proposition]:
+    """
+    Get propositions related to a specific observation.
+    
+    Args:
+        session: Database session
+        observation_id: ID of the observation
+        limit: Optional limit on number of propositions to return
+        
+    Returns:
+        List of related Proposition objects
+    """
+    stmt = (
+        select(Proposition)
+        .join(observation_proposition)
+        .join(Observation)
+        .where(Observation.id == observation_id)
+        .order_by(Proposition.created_at.desc())
+    )
+    
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def search_observations_bm25(
+    session: AsyncSession,
+    user_query: str,
+    *,
+    limit: int = 5,
+    mode: str = "OR",
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> list[tuple[Observation, float]]:
+    """
+    Search observations directly using BM25.
+    
+    Args:
+        session: Database session
+        user_query: Query string to search for
+        limit: Maximum number of results to return
+        mode: Search mode ("OR", "AND", or "PHRASE")
+        start_time: Filter observations after this time
+        end_time: Filter observations before this time
+        
+    Returns:
+        List of (Observation, score) tuples
+    """
+    q = build_fts_query(user_query, mode)
+    if not q:
+        return []
+    
+    fts_obs = Table("observations_fts", MetaData())
+    
+    # Build BM25 query for observations
+    stmt = (
+        select(
+            Observation,
+            literal_column("bm25(observations_fts)").label("bm25")
+        )
+        .select_from(
+            fts_obs.join(
+                Observation,
+                literal_column("observations_fts.rowid") == Observation.id,
+            )
+        )
+        .where(text("observations_fts MATCH :q"))
+        .order_by(literal_column("bm25").asc())  # smallest = best
+        .limit(limit * 2)  # Get more candidates for filtering
+    )
+    
+    # Apply time filters if provided
+    if start_time:
+        stmt = stmt.where(Observation.created_at >= start_time)
+    if end_time:
+        stmt = stmt.where(Observation.created_at <= end_time)
+    
+    result = await session.execute(stmt, {"q": q})
+    rows = result.all()
+    
+    if not rows:
+        return []
+    
+    # Convert BM25 scores to similarity scores (invert and normalize)
+    observations = [(row[0], row[1]) for row in rows]
+    bm25_scores = np.array([score for _, score in observations])
+    
+    # Normalize scores (smaller BM25 = better, so invert)
+    if len(bm25_scores) > 0:
+        max_score = bm25_scores.max()
+        min_score = bm25_scores.min()
+        if max_score != min_score:
+            normalized = 1 - (bm25_scores - min_score) / (max_score - min_score)
+        else:
+            normalized = np.ones_like(bm25_scores)
+    else:
+        normalized = bm25_scores
+    
+    # Return top results
+    result_list = [(observations[i][0], float(normalized[i])) for i in range(len(observations))]
+    return result_list[:limit]
