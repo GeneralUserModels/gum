@@ -33,20 +33,23 @@ Example output format:
 }"""
 
 
-PROPOSE_PROMPT = """You are a helpful assistant tasked with analyzing user behavior based on transcribed activity.
+PROPOSE_PROMPT = """You are a helpful assistant tasked with analyzing user behavior based on transcribed activity, with a focus on understanding **behavioral and temporal patterns**.
 
 # Analysis
 
-Using a transcription of {user_name}'s activity, analyze {user_name}'s current activities, behavior, and preferences. Draw insightful, concrete conclusions.
+Using a transcription of {user_name}'s activity over time, analyze {user_name}'s current activities, behavior, and preferences. Go beyond describing what they are doing—draw **inferences about what kinds of patterns of behaviors, habits, or actions {user_name} appear through their computer use.
+
+# Temporal Pattern Analysis
+
+Pay special attention to:
+- **Behavioral patterns over time**: How activities change throughout the observation period
+- **Behavioral consistency**: Whether patterns are stable or variable
+- **Temporal trends**: Whether behaviors are increasing, decreasing, or cycling
+- **Time-based insights**: How time of day, duration, or frequency affects behavior
 
 To support effective information retrieval (e.g., using BM25), your analysis must **explicitly identify and refer to specific named entities** mentioned in the transcript. This includes applications, websites, documents, people, organizations, tools, and any other proper nouns. Avoid general summaries—**use exact names** wherever possible, even if only briefly referenced.
 
 Consider these points in your analysis:
-
-- What specific tasks or goals is {user_name} actively working towards, as evidenced by named files, apps, platforms, or individuals?
-- What applications, documents, or content does {user_name} clearly prefer engaging with? Identify them by name.
-- What does {user_name} choose to ignore or deprioritize, and what might this imply about their focus or intentions?
-- What are the strengths or weaknesses in {user_name}’s behavior or tools? Cite relevant named entities or resources.
 
 Provide detailed, concrete explanations for each inference. **Support every claim with specific references to named entities in the transcript.**
 
@@ -68,8 +71,8 @@ Score: **1 (weak support)** to **10 (explicit, strong support)**. High scores re
 
 Rate how long the proposition is likely to stay relevant. Consider:
 
-- **Urgency**: Does the task or interest have clear time pressure?
-- **Durability**: Will this matter 24 hours later or more?
+- **Urgency**: Does the behavior pattern have clear time pressure?
+- **Durability**: Will this pattern remain important 24 hours later or more?
 
 Score: **1 (short-lived)** to **10 (long-lasting insight or pattern)**.
 
@@ -83,7 +86,7 @@ Below is a set of transcribed actions and interactions that {user_name} has perf
 
 # Task
 
-Generate **at least 5 distinct, well-supported propositions** about {user_name}, each grounded in the transcript. 
+Generate **at least 5 distinct, well-supported propositions** about {user_name}, each grounded in the transcript, focusing on **behavior patterns**. 
 
 Be conservative in your confidence estimates. Just because an application appears on {user_name}'s screen does not mean they have deeply engaged with it. They may have only glanced at it for a second, making it difficult to draw strong conclusions. 
 
@@ -107,7 +110,7 @@ Return your results in this exact JSON format:
 
 REVISE_PROMPT = """You are an expert analyst. A cluster of similar propositions are shown below, followed by their supporting observations.
 
-Your job is to produce a **final set** of propositions that is clear, non-redundant, and captures everything about the user, {user_name}.
+Your job is to produce a **final set** of propositions that is clear, non-redundant, and captures everything about behavioral patterns of {user_name}.
 
 To support information retrieval (e.g., with BM25), you must **explicitly identify and preserve all named entities** from the input wherever possible. These may include applications, websites, documents, people, organizations, tools, or any other specific proper nouns mentioned in the original propositions or their evidence.
 
@@ -116,10 +119,10 @@ You MAY:
 - **Edit** a proposition for clarity, precision, or brevity.
 - **Merge** propositions that convey the same meaning.
 - **Split** a proposition that contains multiple distinct claims.
-- **Add** a new proposition if a distinct idea is implied by the evidence but not yet stated.
+- **Add** a new proposition if a distinct behavior pattern is implied by the evidence but not yet stated.
 - **Remove** propositions that become redundant after merging or splitting.
 
-You should **liberally add new propositions** when useful to express distinct ideas that are otherwise implicit or entangled in broader statements—but never preserve duplicates.
+You should **liberally add new propositions** when useful to express distinct behavior-related ideas that are otherwise implicit or entangled in broader statements—but never preserve duplicates.
 
 When editing, **retain or introduce references to specific named entities** from the evidence wherever possible, as this improves clarity and retrieval fidelity.
 
@@ -133,7 +136,7 @@ Edge cases to handle:
 General guidelines:
 
 - Keep each proposition clear and concise (typically 1–2 sentences).
-- Maintain all meaningful content from the originals.
+- Maintain all meaningful behavior patterns–related content from the originals.
 - Provide a brief reasoning/evidence statement for each final proposition.
 - Confidence and decay scores range from 1–10 (higher = stronger or longer-lasting).
 
@@ -146,20 +149,20 @@ For each proposition you revise, evaluate its strength using two scales:
 Rate your confidence in the proposition based on how directly and clearly it is supported by the evidence. Consider:
 
 - **Direct Evidence**: Is the claim directly supported by clear, named interactions in the observations?
-- **Relevance**: Is the evidence closely tied to the proposition?
+- **Relevance**: Is the evidence closely tied to the proposed behavioral pattern?
 - **Completeness**: Are key details present and unambiguous?
-- **Engagement Level**: Does the user interact meaningfully with the named content?
+- **Engagement Level**: Does the user interact meaningfully with the named content in a way that reflects a habit or behavioral pattern?
 
 Score: **1 (weak/assumed)** to **10 (explicitly demonstrated)**. High scores require direct and strong evidence from the observations.
 
 ### 2. Decay Scale
 
-Rate how long the insight is likely to remain relevant. Consider:
+Rate how long the behavior pattern insight is likely to remain relevant. Consider:
 
-- **Immediacy**: Is the activity time-sensitive?
-- **Durability**: Will the proposition remain true over time?
+- **Immediacy**: Is the action contributing to the behavior pattern time-sensitive?
+- **Durability**: Will the behavior pattern remain relevant over the long term?
 
-Score: **1 (short-lived)** to **10 (long-term relevance or behavioral pattern)**.
+Score: **1 (short-lived)** to **10 (long-term relevance or enduring habit/pattern)**.
 
 # Input
 
@@ -167,7 +170,7 @@ Score: **1 (short-lived)** to **10 (long-term relevance or behavioral pattern)**
 
 # Output
 
-Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is actively engaging with the content in a meaningful way. Keep in mind that that the input is what the {user_name} is viewing. It may not be what the {user_name} is actively doing, so practice caution when assigning confidence.
+Assign high confidence scores (e.g., 8-10) only when the transcriptions provide explicit, direct evidence that {user_name} is engaging in a behavior that reflects a goal, challenge, or habit they may want to change. Remember that the input shows what {user_name} is viewing, not always what they are intentionally doing. Be cautious about over-interpreting surface-level activity.
 
 Return **only** JSON in the following format:
 
@@ -175,13 +178,82 @@ Return **only** JSON in the following format:
   "propositions": [
     {
       "proposition": "<rewritten / merged / new proposition>",
-      "reasoning":   "<revised reasoning including any named entities where applicable>",
+      "reasoning":   "<revised reasoning including any named entities where applicable, focused on the behavior pattern>",
       "confidence":  <integer 1-10>,
       "decay":       <integer 1-10>
     },
     ...
   ]
 }"""
+
+NOTIFICATION_DECISION_PROMPT = """You are a helpful assistant that decides whether to send behavioral nudge notifications to {user_name}.
+
+Your goal is to help {user_name} change behaviors they want to improve by sending timely, relevant, and actionable notifications.
+
+# Current Context
+
+## Current Observation
+{observation_content}
+
+## Generated Propositions (from this observation)
+{generated_propositions}
+
+## Similar Past Behavioral Patterns
+{similar_propositions}
+
+## Similar Past Observations
+{similar_observations}
+
+## Recent Notification History
+{notification_history}
+
+# Decision Criteria
+
+Consider these factors when deciding whether to notify:
+
+1. **Relevance**: Is this observation related to a behavior {user_name} likely wants to change?
+2. **Timing**: Is this an appropriate moment to nudge {user_name}?
+3. **Actionability**: Can {user_name} act on this notification right now?
+4. **Novelty**: Is this different enough from recent notifications to be valuable?
+5. **Impact**: Could this notification actually influence behavior change?
+
+# Notification Guidelines
+
+**DO notify when:**
+- Pattern suggests procrastination, distraction, or unhealthy habits
+- User is starting/continuing a behavior they've struggled with before
+- Timing is appropriate (not during deep work, important meetings, etc.)
+- Notification offers clear, actionable guidance
+- It's been a while since last similar notification
+
+**DON'T notify when:**
+- User is in focused work state
+- Recent notifications already addressed this
+- Observation is neutral/positive behavior
+- Too many notifications sent recently (notification fatigue)
+- Message would be vague or unhelpful
+
+# Task
+
+Decide whether to send a notification. If yes, craft a **succinct, actionable message** (max 100 characters) that:
+- Acknowledges the current behavior
+- Suggests a specific change
+- Is encouraging, not judgmental
+- Focuses on what user wants to improve
+
+Return your decision in this exact JSON format:
+
+{{
+  "should_notify": true/false,
+  "relevance_score": <1-10>,
+  "urgency_score": <1-10>,
+  "impact_score": <1-10>,
+  "reasoning": "<brief explanation for decision>",
+  "notification_message": "<succinct message if should_notify=true, otherwise empty string>",
+  "notification_type": "<one of: 'focus', 'break', 'habit', 'health', 'productivity', 'none'>"
+}}
+
+Be conservative - only notify when there's clear value. Quality over quantity."""
 
 SIMILAR_PROMPT = """You will label sets of propositions based on how similar they are to eachother.
 
