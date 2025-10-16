@@ -158,9 +158,11 @@ class Screen(Observer):
         debug: bool = False,
         api_key: str | None = None,
         api_base: str | None = None,
+        use_mlx: bool = False,
+        mlx_model: str = "mlx-community/Qwen2-VL-2B-Instruct-4bit",
     ) -> None:
         """Initialize the Screen observer.
-        
+
         Args:
             screenshots_dir (str, optional): Directory to store screenshots. Defaults to "~/.cache/gum/screenshots".
             skip_when_visible (Optional[str | list[str]], optional): Application names to skip when visible.
@@ -172,6 +174,10 @@ class Screen(Observer):
             model_name (str, optional): GPT model to use for vision analysis. Defaults to "gpt-4o-mini".
             history_k (int, optional): Number of recent screenshots to keep in history. Defaults to 10.
             debug (bool, optional): Enable debug logging. Defaults to False.
+            api_key (str, optional): OpenAI API key. Defaults to None (uses env var).
+            api_base (str, optional): OpenAI API base URL. Defaults to None (uses env var).
+            use_mlx (bool, optional): Use local MLX models instead of OpenAI. Defaults to False.
+            mlx_model (str, optional): MLX model to use if use_mlx=True. Defaults to "mlx-community/Qwen2-VL-2B-Instruct-4bit".
         """
         self.screens_dir = os.path.abspath(os.path.expanduser(screenshots_dir))
         os.makedirs(self.screens_dir, exist_ok=True)
@@ -191,13 +197,26 @@ class Screen(Observer):
         self._history: deque[str] = deque(maxlen=max(0, history_k))
         self._pending_event: Optional[dict] = None
         self._debounce_handle: Optional[asyncio.TimerHandle] = None
-        self.client = AsyncOpenAI(
-            # try the class, then the env for screen, then the env for gum
-            base_url=api_base or os.getenv("SCREEN_LM_API_BASE") or os.getenv("GUM_LM_API_BASE"), 
 
-            # try the class, then the env for screen, then the env for GUM, then none
-            api_key=api_key or os.getenv("SCREEN_LM_API_KEY") or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
-        )
+        # Choose backend: MLX or OpenAI
+        self.use_mlx = use_mlx
+
+        if use_mlx:
+            from gum.mlx_client import MLXClient
+            self.client = MLXClient(
+                model_name=mlx_model,
+                max_tokens=1000,
+                temperature=0.7,
+                verbose=debug
+            )
+        else:
+            self.client = AsyncOpenAI(
+                # try the class, then the env for screen, then the env for gum
+                base_url=api_base or os.getenv("SCREEN_LM_API_BASE") or os.getenv("GUM_LM_API_BASE"),
+
+                # try the class, then the env for screen, then the env for GUM, then none
+                api_key=api_key or os.getenv("SCREEN_LM_API_KEY") or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
+            )
 
         # call parent
         super().__init__()

@@ -72,6 +72,8 @@ class gum:
         api_key: str | None = None,
         min_batch_size: int = 5,
         max_batch_size: int = 50,
+        use_mlx: bool = False,
+        mlx_model: str = "mlx-community/Qwen2-VL-2B-Instruct-4bit",
     ):
         # basic paths
         data_directory = os.path.expanduser(data_directory)
@@ -101,10 +103,22 @@ class gum:
         self.revise_prompt = revise_prompt or REVISE_PROMPT
         self.audit_prompt = audit_prompt or AUDIT_PROMPT
 
-        self.client = AsyncOpenAI(
-            base_url=api_base or os.getenv("GUM_LM_API_BASE"), 
-            api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
-        )
+        # Choose backend: MLX or OpenAI
+        self.use_mlx = use_mlx
+
+        if use_mlx:
+            from .mlx_client import MLXClient
+            self.client = MLXClient(
+                model_name=mlx_model,
+                max_tokens=1000,
+                temperature=0.7,
+                verbose=(verbosity <= logging.DEBUG)
+            )
+        else:
+            self.client = AsyncOpenAI(
+                base_url=api_base or os.getenv("GUM_LM_API_BASE"),
+                api_key=api_key or os.getenv("GUM_LM_API_KEY") or os.getenv("OPENAI_API_KEY") or "None"
+            )
 
         self.engine = None
         self.Session = None
@@ -303,7 +317,14 @@ class gum:
             response_format=get_schema(schema),
         )
 
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+        # Handle both {"propositions": [...]} and [...] formats
+        parsed = json.loads(rsp.choices[0].message.content)
+        if isinstance(parsed, list):
+            return parsed  # Direct array format
+        elif isinstance(parsed, dict) and "propositions" in parsed:
+            return parsed["propositions"]  # Wrapped format
+        else:
+            raise ValueError(f"Unexpected response format: {type(parsed)}")
 
     async def _build_relation_prompt(self, all_props) -> str:
         """Build a prompt for analyzing relationships between propositions.
@@ -348,7 +369,14 @@ class gum:
             response_format=get_schema(RelationSchema.model_json_schema()),
         )
 
-        data = RelationSchema.model_validate_json(rsp.choices[0].message.content)
+        # Handle both {"relations": [...]} and [...] formats
+        content = rsp.choices[0].message.content
+        parsed = json.loads(content)
+        if isinstance(parsed, list):
+            # Direct array format - wrap it
+            content = json.dumps({"relations": parsed})
+
+        data = RelationSchema.model_validate_json(content)
 
         id_to_prop = {p.id: p for p in rel_props}
         ident, sim, unrel = set(), set(), set()
@@ -415,9 +443,17 @@ class gum:
         rsp = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
-            response_format=get_schema(PropositionSchema.model_json_schema()), 
+            response_format=get_schema(PropositionSchema.model_json_schema()),
         )
-        return json.loads(rsp.choices[0].message.content)["propositions"]
+
+        # Handle both {"propositions": [...]} and [...] formats
+        parsed = json.loads(rsp.choices[0].message.content)
+        if isinstance(parsed, list):
+            return parsed  # Direct array format
+        elif isinstance(parsed, dict) and "propositions" in parsed:
+            return parsed["propositions"]  # Wrapped format
+        else:
+            raise ValueError(f"Unexpected response format: {type(parsed)}")
 
     async def _generate_and_search(
         self, session: AsyncSession, update: Update

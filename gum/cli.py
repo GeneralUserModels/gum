@@ -29,7 +29,11 @@ def parse_args():
     parser.add_argument('--limit', '-l', type=int, help='Limit the number of results', default=10)
     parser.add_argument('--model', '-m', type=str, help='Model to use')
     parser.add_argument('--reset-cache', action='store_true', help='Reset the GUM cache and exit')  # Add this line
-    
+
+    # MLX configuration arguments
+    parser.add_argument('--use-mlx', action='store_true', help='Use local MLX models instead of OpenAI (Apple Silicon only)')
+    parser.add_argument('--mlx-model', type=str, help='MLX model to use (default: mlx-community/Qwen2.5-VL-7B-Instruct-4bit)')
+
     # Batching configuration arguments
     parser.add_argument('--min-batch-size', type=int, help='Minimum number of observations to trigger batch processing')
     parser.add_argument('--max-batch-size', type=int, help='Maximum number of observations per batch')
@@ -57,7 +61,11 @@ async def main():
     model = args.model or os.getenv('MODEL_NAME') or 'gpt-4o-mini'
     user_name = args.user_name or os.getenv('USER_NAME')
 
-    # Batching configuration - follow same pattern as other args    
+    # MLX configuration - follow same pattern as other args
+    use_mlx = args.use_mlx or os.getenv('USE_MLX', '').lower() in ('true', '1', 'yes')
+    mlx_model = args.mlx_model or os.getenv('MLX_MODEL') or 'mlx-community/Qwen2.5-VL-7B-Instruct-4bit'
+
+    # Batching configuration - follow same pattern as other args
     min_batch_size = args.min_batch_size or int(os.getenv('MIN_BATCH_SIZE', '5'))
     max_batch_size = args.max_batch_size or int(os.getenv('MAX_BATCH_SIZE', '15'))
 
@@ -67,7 +75,7 @@ async def main():
         return
     
     if args.query is not None:
-        gum_instance = gum(user_name, model)
+        gum_instance = gum(user_name, model, use_mlx=use_mlx, mlx_model=mlx_model)
         await gum_instance.connect_db()
         result = await gum_instance.query(args.query, limit=args.limit)
         
@@ -82,12 +90,18 @@ async def main():
             print(f"Relevance Score: {score:.2f}")
             print("-" * 80)
     else:
-        print(f"Listening to {user_name} with model {model}")
-            
+        backend = "MLX (local)" if use_mlx else f"OpenAI ({model})"
+        print(f"Listening to {user_name} with {backend}")
+        if use_mlx:
+            print(f"Using local model: {mlx_model}")
+            print("Cost: $0.00 (completely free!)")
+
         async with gum(
-            user_name, 
-            model, 
-            Screen(model),
+            user_name,
+            model,
+            Screen(model, use_mlx=use_mlx, mlx_model=mlx_model),
+            use_mlx=use_mlx,
+            mlx_model=mlx_model,
             min_batch_size=min_batch_size,
             max_batch_size=max_batch_size
         ) as gum_instance:
