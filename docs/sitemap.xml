@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/api-reference/core/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/api-reference/models/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/api-reference/observers/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/tutorials/gumbo/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/tutorials/mcp/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/tutorials/reflection/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+    <url>
+         <loc>https://generalusermodels.github.io/gum/docs/tutorials/slackbot/</loc>
+         <lastmod>2026-05-11</lastmod>
+    </url>
+</urlset>
