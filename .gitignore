@@ -4,6 +4,9 @@ data
 examples
 skypilot.yaml
 test_gum.py
+node_modules/
+!web/src/data/
+!web/src/data/dynamicData.json
 
 # Python
 __pycache__
@@ -113,4 +116,4 @@ dmypy.json
 .pytype/
 
 # Cython debug symbols
-cython_debug/ 
+cython_debug/

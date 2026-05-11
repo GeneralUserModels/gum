@@ -6,7 +6,7 @@ General User Models learn about you by observing any interaction you have with y
 
 ## Documentation
 
-**Please go here for documentation on setting up and using GUMs: [https://generalusermodels.github.io/gum/](https://generalusermodels.github.io/gum/)**
+**Please go here for documentation on setting up and using GUMs: [https://generalusermodels.github.io/gum/docs/](https://generalusermodels.github.io/gum/docs/)**
 
 ## Contributing
 

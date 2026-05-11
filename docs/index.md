@@ -168,7 +168,7 @@ For example: you can set up [an MCP that uses GUMs here.](tutorials/mcp.md)
 ## Under the hood
 
 <div style="text-align: center;">
-<img src="https://generalusermodels.github.io/final_pipeline.jpg" alt="GUM Pipeline" width="80%" />
+<img src="../final_pipeline.jpg" alt="GUM Pipeline" width="80%" />
 </div>
 
 ### **Observers** collect raw interaction data.

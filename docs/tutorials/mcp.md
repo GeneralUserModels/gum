@@ -46,7 +46,7 @@ The MCP should then be enabled in the Claude app!
 Here's an example of what happens when I prompt Claude and it uses the MCP:
 
 <div style="text-align: center;">
-<img src="https://generalusermodels.github.io/gum/tutorials/mcp.png" alt="Figure 1" width="60%" />
+<img src="../mcp.png" alt="Figure 1" width="60%" />
 </div>
 
 ## Tutorial

@@ -1,0 +1,499 @@
+/* RESET / BASE */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #282828; /* mainBackground from Swift code */
+  color: #d6ceba;           /* mainText from Swift code */
+}
+
+:root {
+  /* Colors from your Swift code's ColorExtensions */
+  --color-main-bg: #282828;       /* mainBackground */
+  --color-sidebar-bg: #2A2D32;    /* sidebarBackground */
+  --color-main-text: #d6ceba;     /* mainText */
+  --color-sub-text: #9c978c;      /* subText */
+  --color-suggestion-text: #E8E2D3;
+  --hover-bg: rgba(255, 255, 255, 0.1);
+  --border-color: rgba(255, 255, 255, 0.2);
+  --chat-button-bg: #A22651;      /* from Swift code for “Start Chat” buttons */
+}
+
+/* APP CONTAINER */
+.app-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  background-color: var(--color-main-bg);
+  border-radius: 8px;
+}
+
+/* NAVBAR */
+.navbar {
+  position: relative;
+  background-color: var(--color-sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+  min-width: 180px; /* user can resize smaller, but not below this */
+  color: var(--color-main-text);
+  border-radius: 8px;
+}
+
+/* Resizer on the right edge */
+.resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+}
+.resizer:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.navbar h2 {
+  margin: 0 0 20px 0;
+  font-weight: 600;
+}
+
+/* NAV LINKS */
+.nav-link {
+  display: block;
+  color: var(--color-main-text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+/* Hover + Active = same styling now */
+.nav-link:hover,
+.nav-link-active {
+  background-color: var(--hover-bg);
+  color: var(--color-main-text);
+}
+
+/* MAIN CONTENT */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* We’ll manage scrolling in child components */
+  border-radius: 8px;
+}
+
+/* PAGE CONTENT (Suggestions or Chat) */
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background-color: var(--color-main-bg);
+  padding: 20px;
+}
+
+/* SUGGESTIONS PAGE */
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  /* margin-top: 50px; */
+  /* margin-bottom: 10px; */
+  margin-left: 40px;
+  text-align: left;
+  color: var(--color-main-text);
+}
+
+/* Center the suggestion list container, max 800px wide */
+.suggestions-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* SUGGESTION ITEM */
+.suggestion-item {
+  background-color: #1E1E1E; /* Slightly darker than main BG */
+  border: 1px solid rgba(214, 206, 186, 0.4); /* subtle border, using mainText with opacity */
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  /* margin-left: 30px; */
+  transition: border-color 0.4s ease;
+}
+.suggestion-item:hover {
+  border-color: var(--color-main-text);
+}
+.suggestion-title {
+  
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: var(--color-main-text);
+}
+.suggestion-description {
+  font-size: 13px;
+  margin: 0 0 12px 0;
+  color: var(--color-sub-text);
+}
+.start-chat-button {
+  display: inline-block;
+  padding: 6px 8px;
+  background-color: var(--chat-button-bg);
+  color: var(--color-main-text);
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.start-chat-button:hover {
+  border-color: var(--color-main-text);
+}
+
+/* CHAT PAGE */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 20px;
+  background-color: var(--color-main-bg);
+  padding-top: 50px;
+  min-height: 500px
+}
+
+/* Center the chat title */
+.chat-container h2 {
+  text-align: center;
+  margin: 0 0 20px 0;
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--color-main-text);
+}
+
+/* No big outline for chat messages */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  /* Removed border and radius to match your macOS style */
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+/* Chat bubble container */
+.chat-bubble {
+  margin-top: 30px;
+  margin-bottom: 12px;
+}
+
+/* ASSISTANT BUBBLE: centered, no “bubble” background */
+.chat-bubble-assistant {
+  display: flex;
+  justify-content: center;
+}
+.chat-bubble-assistant .chat-bubble-content {
+  max-width: 800px;
+  text-align: left;
+  background-color: transparent;
+  color: var(--color-main-text);
+  padding: 0;
+  line-height: 1.5;
+  /* You can add a bit of margin if you want some space from the edges: */
+  margin: 0 16px;
+}
+
+/* USER BUBBLE: right-aligned with translucent background */
+.chat-bubble-user {
+  display: flex;
+  justify-content: flex-end;
+  margin-right: 16px;
+}
+.chat-bubble-user .chat-bubble-content {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #d6ceba;
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-width: 400px;
+  text-align: left;
+  line-height: 1.5;
+}
+
+/* The container for our input + icon */
+.chat-input-bar {
+  position: relative;
+  width: 90%;
+  height: 70px;
+  margin: 20px auto;
+  border-radius: 8px;
+  background-color: #1E1E1E;
+  border: 1px solid rgba(214, 206, 186, 0.5);
+  transition: border 0.2s ease;
+  display: flex;
+  align-items: flex-start; /* ensure children start at the top */
+  box-sizing: border-box;
+  padding-right: 45px; /* space for icon button on right */
+}
+
+/* Thicker border on focus */
+.chat-input-bar:focus-within {
+  border: 2px solid #d6ceba;
+}
+
+/* The text editor (input/textarea) */
+.chat-text-editor {
+  flex: 1;
+  /* Remove or reduce top padding so the text sits near the top */
+  padding: 10px 15px;  
+  font-size: 14px;
+  color: #d6ceba;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  resize: none;   /* if it's a textarea, prevents manual resizing */
+  box-sizing: border-box;
+  line-height: 1.4; /* adjust for desired spacing */
+}
+
+/* The send icon button (paper plane) */
+.chat-send-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background-color: #A22651;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d6ceba;
+  transition: border 0.2s ease;
+  outline: none;
+}
+
+.chat-send-icon:hover {
+  border: 2px solid #d6ceba;
+}
+
+.appTitle {
+  margin-left: 10px;
+  margin-top: 10px;
+}
+
+.abstract-paragraph {
+  line-height: 1.6;
+  margin: 0;
+  font-size: 15px;
+  text-align: justify;
+  padding-left: 20%;
+  padding-right: 20%
+}
+
+@media (max-width: 1400px) {
+  .abstract-paragraph {
+    padding-left: 10%;
+    padding-right: 10%
+  }
+}
+
+@media (max-width: 600px) {
+  .abstract-paragraph {
+    padding-left: 5%;
+    padding-right: 5%
+  }
+}
+
+.layout {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.left-pane {
+  flex: 1.1;
+}
+
+.carousel-pane {
+  flex: 1.8;
+  overflow: hidden;
+}
+
+/* When the viewport is under 1000px, stack with carousel on top */
+@media (max-width: 1000px) {
+  .layout {
+    flex-direction: column-reverse;
+  }
+  
+  .carousel-pane {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+.flow-figure-container {
+  display: flex;
+  justify-content: center;
+  margin: 30px auto;
+  width: 70%;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.responsive-image {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 1200px) {
+  .flow-figure-container {
+    width: 80%;
+  }
+}
+
+@media (max-width: 900px) {
+  .flow-figure-container {
+    width: 90%;
+  }
+}
+
+.graph-figure-container {
+  display: flex;
+  justify-content: center;
+  margin: 30px auto;
+  width: 25%;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 1200px) {
+  .graph-figure-container {
+    width: 50%;
+  }
+}
+
+@media (max-width: 900px) {
+  .graph-figure-container {
+    width: 80%;
+  }
+}
+
+.leftpane-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 24px;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+@media (max-width: 1000px) {
+  .leftpane-container {
+    padding-top: 0;
+  }
+}
+
+.app-screenshot-container {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 1400px) {
+  .app-screenshot-container {
+    max-width: 800px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .app-screenshot-container {
+    max-width: 600px;
+  }
+}
+
+@media (max-width: 800px) {
+  .app-screenshot-container {
+    max-width: 400px;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-screenshot-container {
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 500px) {
+  .app-screenshot-container {
+    max-width: 240px;
+  }
+}
+
+.app-screenshot-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 2.5rem;
+  color: var(--color-main-text);
+}
+
+
+
+.app-screenshot-arrow--left {
+  left: -70px;
+}
+
+.app-screenshot-arrow--right {
+  right: -70px;
+}
+
+@media (max-width: 1400px) {
+  .app-screenshot-arrow--left {
+    left: -60px;
+  }
+  
+  .app-screenshot-arrow--right {
+    right: -60px;
+  }
+}
+
+@media (max-width: 800px) {
+  .app-screenshot-arrow {
+    font-size: 1.75rem;
+  }
+
+  .app-screenshot-arrow--left {
+    left: -50px;
+  }
+  
+  .app-screenshot-arrow--right {
+    right: -50px;
+  }
+}
+
+.app-screenshot-image {
+  width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
