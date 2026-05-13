@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--limit', '-l', type=int, help='Limit the number of results', default=10)
     parser.add_argument('--model', '-m', type=str, help='Model to use')
     parser.add_argument('--reset-cache', action='store_true', help='Reset the GUM cache and exit')  # Add this line
+    parser.add_argument('--list-apps', action='store_true', help='List currently visible application names and exit')
     
     # Batching configuration arguments
     parser.add_argument('--min-batch-size', type=int, help='Minimum number of observations to trigger batch processing')
@@ -65,6 +66,17 @@ async def main():
     # Batching configuration - follow same pattern as other args    
     min_batch_size = args.min_batch_size or int(os.getenv('MIN_BATCH_SIZE', '5'))
     max_batch_size = args.max_batch_size or int(os.getenv('MAX_BATCH_SIZE', '15'))
+
+    if getattr(args, 'list_apps', False):
+        screen = Screen(model)
+        windows = screen.capture.get_window_list()
+        # Use a set to get unique owner names and filter out empty strings
+        apps = sorted(list(set(w['owner_name'] for w in windows if w.get('owner_name'))))
+        print("\nVisible applications:")
+        for app in apps:
+            print(f" - {app}")
+        print("-" * 20)
+        return
 
     # you need one of: user_name for listening mode, --query, or --recent
     if user_name is None and args.query is None and not getattr(args, 'recent', False):

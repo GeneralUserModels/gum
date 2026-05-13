@@ -9,8 +9,8 @@ setup(
         "pillow",  # For image processing
         "mss",  # For screen capture
         "pynput",  # For mouse/keyboard monitoring
-        "shapely",  # For geometry operations
-        "pyobjc-framework-Quartz",  # For macOS window management
+        "pyobjc-framework-Quartz; sys_platform == 'darwin'",  # For macOS window management
+        "shapely; sys_platform == 'darwin'",  # For geometry operations
         "openai>=1.0.0",
         "SQLAlchemy>=2.0.0",
         "pydantic>=2.0.0",
@@ -18,6 +18,11 @@ setup(
         "python-dotenv>=1.0.0",
         "scikit-learn",
         "aiosqlite",
+        "aiohttp",
+        "beautifulsoup4",
+        "ics",
+        "tatsu<5.0",
+        "persist-queue",
         "greenlet"
     ],
     entry_points={
