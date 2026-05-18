@@ -4,3 +4,40 @@ mkdocstrings>=0.24.0
 mkdocstrings-python>=1.7.0 
 mistune==3.0.2
 # pymdown-extensions>=10.0.0
+
+# Core dependencies for GUM (General User Models)
+# Image processing and screen capture
+pillow
+mss
+pynput
+shapely
+
+# macOS window management (conditionally installed)
+pyobjc-framework-Quartz; sys_platform == "darwin"
+
+# AI and OpenAI clients
+openai>=1.0.0
+
+# Database and ORM
+SQLAlchemy>=2.0.0
+aiosqlite
+greenlet
+
+# Data validation and serialization
+pydantic>=2.0.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# Machine learning and data processing
+scikit-learn
+numpy
+
+# Date/time utilities
+python-dateutil
+
+# Development and building tools (optional)
+setuptools>=42
+wheel
+build
+twine
